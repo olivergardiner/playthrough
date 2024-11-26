@@ -28,7 +28,7 @@ MainWindow::MainWindow(QWidget *parent)
     BASS_INFO info;
     BASS_GetInfo(&info);
 
-    BASS_SetConfig(BASS_CONFIG_BUFFER, 10 + info.minbuf);
+    BASS_SetConfig(BASS_CONFIG_BUFFER, UPDATE_PERIOD + info.minbuf);
     BASS_RecordInit(-1);
 
     BASS_DEVICEINFO recordInfo;
@@ -84,74 +84,32 @@ void MainWindow::on_outputDevice_currentIndexChanged(int index)
     ui->outputVolume->setValue(99.0 * BASS_GetVolume());
 }
 
+/**
+ * @brief stream    A STREAMPROC callback that is responsible for servicing requests for data to deliver to the output stream
+ * @param handle    A handle to the playback HSTREAM
+ * @param buffer    The buffer to write the requested amount of data to
+ * @param length    The number of bytes to write to the buffer
+ * @param user      User data pointer, here used to provide a pointer to the record handle HRECORD
+ * @return          The number of bytes actually read from the recording device into the playback device
+ */
 DWORD CALLBACK stream(HSTREAM handle, void *buffer, DWORD length, void *user)
 {
     HRECORD *recordHandle = (HRECORD *) user;
-    char *buf = (char *) buffer;
 
     unsigned int c = BASS_ChannelGetData(*recordHandle, 0, BASS_DATA_AVAILABLE) - length;
-    if (c > 3 * CHUNK) { // we have more than 30ms of data in the record buffer so need to delete some (1 CHUNK = 10ms)
+    if (c > 3 * CHUNK) { // we have more than 30ms of data in the record buffer so need to delete some (1 CHUNK = 10ms) - this should never happen as the sample rates are the same
         BASS_ChannelGetData(*recordHandle, NULL, c - CHUNK); // this leaves 10ms of data in the buffer after fulfilling the playback request
     }
 
     // fetch recorded data into stream
-    return BASS_ChannelGetData(*recordHandle, buf, length);
-
-    /*
-     * The initial check below is to see if there is a build up of data in the record buffer. If there is, then we remove some of it to keep the buffer size down.
-     * This shouldn't ever happen if the sample rates for the record device and the playback device are the same, though.
-     *
-     * A "chunk" appears to be the standard amount of data typically read and equates to 10ms of data (1764 bytes @ 4 bytes per stereo 16 bit sample and 44.1kHz).
-     * While the value of chunk is theoretically "read" from BASS, it appears to be a constant (1764) and the fact that the check is essentially whether we have
-     * more than 2 chunks plus 1764 (after fulfilling the request) seems to confirm this.
-     *
-     * Given that BASS is initialsed with a 10ms update period, I assume that the value of "chunk" is actually dertermined directly from the update period and the
-     * sample rate.
-     *
-     * In this context, it may be preferable to make chunk a constant rather than a variable.
-     */
-
-    /*
-    unsigned int c = BASS_ChannelGetData(reader->recordHandle, 0, BASS_DATA_AVAILABLE);
-    c -= length;
-    if (c > 2 * reader->chunk + 1764) {				// buffer has gotten pretty large so remove some
-        c -= reader->chunk;		// leave a single 'chunk'
-        BASS_ChannelGetData(reader->recordHandle, 0, c);	// remove it
-    }
-
-    // fetch recorded data into stream
-    c = BASS_ChannelGetData(reader->recordHandle, buf, length);
-
-    // Rather than attempting to fulfil the whole request by padding with silence, it may be better to simply return the actual number of bytes read.
-    if (c < length) {
-        memset (buf + c, 0, length - c);	// short of data
-    }
-
-    return length;
-    */
+    return BASS_ChannelGetData(*recordHandle, buffer, length);
 }
 
 void MainWindow::on_runButton_clicked(bool checked)
 {
     if (checked) {
         ui->runButton->setText("Stop");
-        /*
-         * This should be unnecessary as already handled by on_inputVolume_valueChanged.
-         *
-        float volume = (float) ui->inputVolume->value() / 99.0;
-        BASS_RecordSetInput(0, BASS_INPUT_ON, volume);
-        */
-
         recordHandle = BASS_RecordStart(SAMPLE_RATE, CHANNELS, 0, NULL, 0);
-
-        /*
-         * This should also be unnecessary as a lack of input data should simply result in no data being passed to the output stream.
-         *
-        //wait for data to arrive
-        while (!BASS_ChannelGetData(recordHandle, 0, BASS_DATA_AVAILABLE));
-        */
-
-        //create Playback Stream
         playHandle = BASS_StreamCreate(SAMPLE_RATE, CHANNELS, 0, (STREAMPROC *) &stream, &recordHandle);
         BASS_ChannelPlay (playHandle, FALSE);
     } else {
