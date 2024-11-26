@@ -10,11 +10,6 @@ class MainWindow;
 }
 QT_END_NAMESPACE
 
-typedef struct {
-    HRECORD recordHandle;
-    unsigned int chunk;
-} reader_t;
-
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -37,6 +32,6 @@ private slots:
 private:
     Ui::MainWindow *ui;
 
+    HRECORD recordHandle;
     HSTREAM playHandle;
-    reader_t reader;
-};
+ };
