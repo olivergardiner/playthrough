@@ -32,6 +32,8 @@ private slots:
 private:
     Ui::MainWindow *ui;
 
+    static DWORD CALLBACK stream(HSTREAM handle, void *buffer, DWORD length, void *user);
+
     HRECORD recordHandle;
     HSTREAM playHandle;
  };

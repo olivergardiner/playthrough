@@ -92,7 +92,7 @@ void MainWindow::on_outputDevice_currentIndexChanged(int index)
  * @param user      User data pointer, here used to provide a pointer to the record handle HRECORD
  * @return          The number of bytes actually read from the recording device into the playback device
  */
-DWORD CALLBACK stream(HSTREAM handle, void *buffer, DWORD length, void *user)
+DWORD CALLBACK MainWindow::stream(HSTREAM handle, void *buffer, DWORD length, void *user)
 {
     HRECORD *recordHandle = (HRECORD *) user;
 
